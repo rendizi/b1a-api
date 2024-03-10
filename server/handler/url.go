@@ -31,16 +31,13 @@ func Shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check for auth
 	tokenString := r.Header.Get("Authorization")
 	var email string
 	if tokenString != "" {
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Check the signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-			// Return the secret key for validation
 			return jwtSecret, nil
 		})
 		if err != nil {
@@ -48,13 +45,11 @@ func Shorten(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Check if token is valid
 		if !token.Valid {
 			http.Error(w, "Token is not valid", http.StatusUnauthorized)
 			return
 		}
 
-		// Extract ID from token claims
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			http.Error(w, "Error extracting token claims", http.StatusInternalServerError)
@@ -69,8 +64,6 @@ func Shorten(w http.ResponseWriter, r *http.Request) {
 		email = "users@gmail.com"
 	}
 
-	// Parse and validate the token
-
 	if !url.IsVal(data["url"]) {
 		http.Error(w, "not valid url", http.StatusBadRequest)
 		return
@@ -80,23 +73,49 @@ func Shorten(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		if db.IsFreeUrl(prefered) == nil {
 			short = prefered
+			err = db.InsertUrl(data["url"], short, email, data["sharedWith"], data["topic"], data["message"])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			dat := struct {
+				Email    string `json:"email"`
+				ShortUrl string `json:"shorturl"`
+			}{
+				Email:    email,
+				ShortUrl: short,
+			}
+
+			jsonData, err := json.Marshal(dat)
+			if err != nil {
+				http.Error(w, "Error marshalling json", http.StatusInternalServerError)
+				return
+			}
+			w.Write(jsonData)
+			return
 		} else {
 			http.Error(w, "prefered url already in use", http.StatusBadRequest)
 			return
 		}
 	} else {
-		for {
-			short = generator.Do()
-			if db.IsFreeUrl(short) == nil {
-				break
+		if is, stored, err := db.IsInDb(data["url"]); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		} else if is {
+			short = stored
+		} else {
+			for {
+				short = generator.Do()
+				if db.IsFreeUrl(short) == nil {
+					break
+				}
+			}
+			err = db.InsertUrl(data["url"], short, email, data["sharedWith"], data["topic"], data["message"])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 		}
-
-	}
-	err = db.InsertUrl(data["url"], short, email, data["sharedWith"], data["topic"], data["message"])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 	dat := struct {
 		Email    string `json:"email"`
@@ -126,7 +145,6 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {
-		// prosto sokratit
 		data := struct {
 			Email string `json:"email"`
 			Url   string `json:"url"`
@@ -144,13 +162,10 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse and validate the token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Check the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
-		// Return the secret key for validation
 		return jwtSecret, nil
 	})
 	if err != nil {
@@ -158,13 +173,11 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if token is valid
 	if !token.Valid {
 		http.Error(w, "Token is not valid", http.StatusUnauthorized)
 		return
 	}
 
-	// Extract ID from token claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		http.Error(w, "Error extracting token claims", http.StatusInternalServerError)

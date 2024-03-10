@@ -38,7 +38,7 @@ func init() {
 	createTableQuery := `
         CREATE TABLE IF NOT EXISTS urls (
           id SERIAL PRIMARY KEY,
-          url TEXT NOT NULL,
+          url TEXT NOT NULL UNIQUE,
           shortUrl TEXT NOT NULL UNIQUE, 
           author TEXT NOT NULL, 
           sharedWith TEXT NOT NULL,

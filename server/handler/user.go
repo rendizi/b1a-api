@@ -14,7 +14,6 @@ import (
 
 var jwtSecret = []byte("your_secret_key")
 
-// Login handler
 func Login(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -39,7 +38,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate user credentials
 	err = db.ValidateUser(data["email"], data["password"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -66,9 +64,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonResponse)
 }
 
-// Register handler
 func Register(w http.ResponseWriter, r *http.Request) {
-	// Reads body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
@@ -78,14 +74,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	data := make(map[string]string)
 
-	// Unmarshalling into map
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		http.Error(w, "Error unmarshalling JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Checks if email and password provided
 	if _, ok := data["email"]; !ok {
 		http.Error(w, "No email provided", http.StatusBadRequest)
 		return
@@ -95,14 +89,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verifies email
 	err = email.Verify(data["email"])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Inserts user data into database
 	err = db.InsertUser(data["email"], data["password"])
 	if err != nil {
 		resp := "something went wrong in db"
@@ -122,13 +114,10 @@ func Links(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse and validate the token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Check the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
-		// Return the secret key for validation
 		return jwtSecret, nil
 	})
 	if err != nil {
@@ -136,13 +125,11 @@ func Links(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if token is valid
 	if !token.Valid {
 		http.Error(w, "Token is not valid", http.StatusUnauthorized)
 		return
 	}
 
-	// Extract ID from token claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		http.Error(w, "Error extracting token claims", http.StatusInternalServerError)

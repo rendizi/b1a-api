@@ -16,7 +16,6 @@ func InsertUrl(url, shortUrl, author, sharedWith, topic, message string) error {
 
 	arr := strings.Fields(sharedWith)
 	for _, email := range arr {
-		// Check if the array is full
 		fullQuery := `SELECT array_length(sharedWithMe, 1) >= 5 FROM users WHERE email = $1`
 		var isFull bool
 		err = db.QueryRow(fullQuery, email).Scan(&isFull)
@@ -25,7 +24,6 @@ func InsertUrl(url, shortUrl, author, sharedWith, topic, message string) error {
 		}
 
 		if isFull {
-			// If the array is full, remove the first element before appending
 			updateQuery := `
                 UPDATE users 
                 SET sharedWithMe = array_append(sharedWithMe[2:5], $1) 
@@ -36,7 +34,6 @@ func InsertUrl(url, shortUrl, author, sharedWith, topic, message string) error {
 				return err
 			}
 		} else {
-			// If the array is not full, simply append the new element
 			updateQuery := `UPDATE users SET sharedWithMe = array_append(sharedWithMe, $1) WHERE email = $2`
 			_, err = db.Exec(updateQuery, shortUrl, email)
 			if err != nil {
@@ -70,7 +67,6 @@ func GetUrl(shortUrl string) (string, error) {
 		return "", err
 	}
 
-	// Update the clicked count in the database
 	_, err = db.Exec("UPDATE urls SET clicked = clicked + 1 WHERE shortUrl = $1", shortUrl)
 	if err != nil {
 		return "", err
@@ -90,4 +86,16 @@ func GetInfo(shortUrl string) ([]string, error) {
 		return nil, err
 	}
 	return []string{topic, message, fmt.Sprintf("%d", clicked)}, nil
+}
+
+func IsInDb(url string) (bool, string, error) {
+	var stored string
+	err := db.QueryRow("SELECT shortUrl FROM urls WHERE url = $1", url).Scan(&stored)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, "", nil
+		}
+		return false, "", err
+	}
+	return true, stored, nil
 }
